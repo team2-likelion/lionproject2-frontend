@@ -54,7 +54,7 @@ export default function AuthPage() {
     setError(null);
     try {
       const res = await authApi.checkEmailDuplicate(email);
-      if (res.success) {
+      if (res.success && res.data) {
         setEmailChecked(true);
         setEmailAvailable(!res.data.duplicated);
         if (res.data.duplicated) {
@@ -78,7 +78,7 @@ export default function AuthPage() {
     setError(null);
     try {
       const res = await authApi.checkNicknameDuplicate(nickname);
-      if (res.success) {
+      if (res.success && res.data) {
         setNicknameChecked(true);
         setNicknameAvailable(!res.data.duplicated);
         if (res.data.duplicated) {
