@@ -23,8 +23,6 @@ export default function PaymentPage() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lessonCount, setLessonCount] = useState(4);
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [config, setConfig] = useState<PortOneConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -85,9 +83,7 @@ export default function PaymentPage() {
 
   const tutorialPrice = tutorial?.price ?? 0;
   const orderAmount = tutorialPrice * lessonCount;
-  const couponDiscount = appliedCoupon?.discount || 0;
-  const pointUsed = 0;
-  const totalAmount = orderAmount - couponDiscount - pointUsed;
+  const totalAmount = orderAmount;
   const mentorName = tutorial?.mentorNickname ?? '멘토';
 
   // 수업 횟수 증가
@@ -101,20 +97,6 @@ export default function PaymentPage() {
   const handleDecrease = () => {
     if (lessonCount > MIN_LESSON_COUNT) {
       setLessonCount(prev => prev - 1);
-    }
-  };
-
-  // 쿠폰 조회 및 적용(임시)
-  const handleCouponLookup = () => {
-    if (couponCode.trim()) {
-      if (couponCode === 'WELCOME20') {
-        setAppliedCoupon({ code: couponCode, discount: 20000 });
-        alert('쿠폰이 적용되었습니다!');
-      } else {
-        alert('유효하지 않은 쿠폰 코드입니다.');
-      }
-    } else {
-      alert('보유 중인 쿠폰 2개가 있습니다.');
     }
   };
 
@@ -368,46 +350,6 @@ export default function PaymentPage() {
                 </button>
               </div>
             </div>
-
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">confirmation_number</span>
-                할인 및 쿠폰
-              </h2>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  placeholder="쿠폰 코드를 입력하세요"
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                />
-                <button
-                  onClick={handleCouponLookup}
-                  className="px-6 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                >
-                  쿠폰 조회
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                보유 중인 쿠폰이 2개 있습니다. [쿠폰 조회]를 클릭해 확인하세요.
-              </p>
-              {appliedCoupon && (
-                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-green-700 dark:text-green-400">
-                      쿠폰 적용됨: {appliedCoupon.code}
-                    </span>
-                    <button
-                      onClick={() => setAppliedCoupon(null)}
-                      className="text-xs text-green-600 dark:text-green-400 hover:underline"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
           <div>
@@ -422,16 +364,6 @@ export default function PaymentPage() {
                   <span className="text-slate-900 dark:text-white font-semibold">
                     ₩{orderAmount.toLocaleString()}
                   </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">할인 금액 (쿠폰 할인)</span>
-                  <span className="text-red-500 font-semibold">
-                    {couponDiscount > 0 ? `- ₩${couponDiscount.toLocaleString()}` : '- ₩0'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">포인트 사용</span>
-                  <span className="text-slate-900 dark:text-white font-semibold">₩{pointUsed.toLocaleString()}</span>
                 </div>
               </div>
 

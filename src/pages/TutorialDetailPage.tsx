@@ -37,6 +37,9 @@ export default function TutorialDetailPage() {
 
   const [tutorial, setTutorial] = useState<Tutorial | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewPage, setReviewPage] = useState(0);
+  const [reviewTotalElements, setReviewTotalElements] = useState(0);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +71,10 @@ export default function TutorialDetailPage() {
         }
 
         if (reviewsRes.success && reviewsRes.data) {
-          setReviews(reviewsRes.data.content);
+          const reviewData = reviewsRes.data;
+          setReviews(reviewData.content || []);
+          setReviewTotalElements(reviewData.page?.totalElements || 0);
+          setReviewPage(reviewData.page?.number || 0);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.');
@@ -131,6 +137,34 @@ export default function TutorialDetailPage() {
   const handleCalendarDateSelect = (date: Date) => {
     setInitialSelectedDate(date);
     handleApplyClick();
+  };
+
+  // 리뷰 더보기 핸들러
+  const handleLoadMoreReviews = async () => {
+    if (!tutorialId || isLoadingReviews) return;
+
+    setIsLoadingReviews(true);
+    try {
+      const nextPage = reviewPage + 1;
+      const reviewsRes = await reviewApi.getReviews(Number(tutorialId), { 
+        page: nextPage, 
+        size: 5 
+      });
+
+      if (reviewsRes.success && reviewsRes.data) {
+        const reviewData = reviewsRes.data;
+        setReviews(prev => [...prev, ...(reviewData.content || [])]);
+        // totalElements 업데이트 (서버에서 최신 값 받아오기)
+        if (reviewData.page?.totalElements !== undefined) {
+          setReviewTotalElements(reviewData.page.totalElements);
+        }
+        setReviewPage(nextPage);
+      }
+    } catch (err) {
+      console.error('리뷰 로딩 실패:', err);
+    } finally {
+      setIsLoadingReviews(false);
+    }
   };
 
   if (isLoading) {
@@ -283,8 +317,22 @@ export default function TutorialDetailPage() {
                       <p className="text-sm text-muted-foreground leading-relaxed">{review.content}</p>
                     </div>
                   ))}
-                  {reviews.length >= 5 && (
-                    <Button variant="outline" className="w-full">더보기</Button>
+                  {reviewTotalElements > reviews.length && reviews.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={handleLoadMoreReviews}
+                      disabled={isLoadingReviews}
+                    >
+                      {isLoadingReviews ? (
+                        <>
+                          <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
+                          로딩 중...
+                        </>
+                      ) : (
+                        '더보기'
+                      )}
+                    </Button>
                   )}
                 </div>
               )}
@@ -333,9 +381,6 @@ export default function TutorialDetailPage() {
                         <span className="material-symbols-outlined ml-2">arrow_forward</span>
                       </>
                     )}
-                  </Button>
-                  <Button variant="secondary" className="w-full">
-                    문의하기 (실시간 채팅)
                   </Button>
                 </CardContent>
               </Card>

@@ -306,20 +306,13 @@ export default function MentorDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <Link
             to={mentorId ? `/mentor/${mentorId}` : '/mentor/dashboard'}
             className="flex flex-col items-center gap-2 p-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary/50 transition-colors"
           >
             <span className="material-symbols-outlined text-3xl text-slate-600 dark:text-slate-300">person</span>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">프로필 관리</span>
-          </Link>
-          <Link
-            to="/tutorial/create"
-            className="flex flex-col items-center gap-2 p-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary/50 transition-colors"
-          >
-            <span className="material-symbols-outlined text-3xl text-slate-600 dark:text-slate-300">school</span>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">과외 관리</span>
           </Link>
           <Link
             to="/qna"

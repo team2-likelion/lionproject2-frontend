@@ -16,10 +16,12 @@ export interface Review {
 // 리뷰 목록 응답 타입
 export interface ReviewListResponse {
   content: Review[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
+  page: {
+    size: number;
+    number: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 // 리뷰 작성 요청 타입 (백엔드: PostReviewCreateRequest)

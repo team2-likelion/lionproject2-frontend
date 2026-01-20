@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import * as lessonApi from '@/api/lesson';
 import * as paymentApi from '@/api/payment';
+import * as reviewApi from '@/api/review';
 import type { Lesson } from '@/api/lesson';
 import type { Ticket } from '@/api/payment';
+import type { Review } from '@/api/review';
 import { LessonBookingDialog } from '@/components/booking/LessonBookingDialog';
 import { ReviewWriteDialog } from '@/components/review/ReviewWriteDialog';
 
@@ -31,6 +33,7 @@ export default function MenteeDashboardPage() {
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [reviews, setReviews] = useState<Map<number, Review>>(new Map()); // tutorialId -> Review
   const [isLoading, setIsLoading] = useState(true);
   const [activeNav, setActiveNav] = useState('dashboard');
   const [reservationModal, setReservationModal] = useState<{
@@ -42,7 +45,9 @@ export default function MenteeDashboardPage() {
     tutorialId: number;
     tutorialTitle: string;
     mentorNickname: string;
-  }>({ isOpen: false, tutorialId: 0, tutorialTitle: '', mentorNickname: '' });
+    reviewId?: number;
+    isEdit?: boolean;
+  }>({ isOpen: false, tutorialId: 0, tutorialTitle: '', mentorNickname: '', reviewId: undefined, isEdit: false });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -55,7 +60,7 @@ export default function MenteeDashboardPage() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
-  const fetchData = async () => {
+    const fetchData = async () => {
     setIsLoading(true);
     try {
       const [lessonsRes, ticketsRes] = await Promise.all([
@@ -68,6 +73,21 @@ export default function MenteeDashboardPage() {
       }
       if (ticketsRes.success && ticketsRes.data) {
         setTickets(ticketsRes.data);
+        
+        // 각 튜토리얼에 대한 리뷰 정보 가져오기
+        const reviewMap = new Map<number, Review>();
+        const reviewPromises = ticketsRes.data.map(async (ticket) => {
+          try {
+            const reviewRes = await reviewApi.getMyReview(ticket.tutorialId);
+            if (reviewRes.success && reviewRes.data) {
+              reviewMap.set(ticket.tutorialId, reviewRes.data);
+            }
+          } catch {
+            // 리뷰가 없으면 무시
+          }
+        });
+        await Promise.all(reviewPromises);
+        setReviews(reviewMap);
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -103,13 +123,19 @@ export default function MenteeDashboardPage() {
       const hasOngoing = ticketLessons.some(l => ['CONFIRMED', 'SCHEDULED', 'IN_PROGRESS'].includes(l.status));
       const hasWaiting = ticketLessons.some(l => l.status === 'REQUESTED');
 
-      let status: 'ongoing' | 'waiting' | 'completed' = 'completed';
-      if (hasOngoing) status = 'ongoing';
+      // 환불된 티켓: 레슨이 없고 expired가 true이면 사용불가
+      const isUnavailable = ticketLessons.length === 0 && ticket.expired;
+
+      let status: 'ongoing' | 'waiting' | 'completed' | 'unavailable' = 'completed';
+      if (isUnavailable) status = 'unavailable';
+      else if (hasOngoing) status = 'ongoing';
       else if (hasWaiting) status = 'waiting';
       else if (ticket.remainingCount > 0 && completedCount > 0) status = 'ongoing';
       else if (ticket.remainingCount === 0 && completedCount === ticket.totalCount) status = 'completed';
       else if (completedCount === 0) status = 'waiting';
 
+      const review = reviews.get(ticket.tutorialId);
+      
       return {
         ...ticket,
         usedCount: ticket.totalCount - ticket.remainingCount,
@@ -118,9 +144,10 @@ export default function MenteeDashboardPage() {
         hasPendingLesson,
         hasConfirmedLesson,
         canBook,
+        review,
       };
     });
-  }, [tickets, lessons]);
+  }, [tickets, lessons, reviews]);
 
   // Stats 계산 (courseList 기반)
   const stats = useMemo(() => {
@@ -184,13 +211,6 @@ export default function MenteeDashboardPage() {
               <span className="material-symbols-outlined text-xl">receipt_long</span>
               결제 내역
             </Link>
-            <button
-              onClick={() => setActiveNav('settings')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-            >
-              <span className="material-symbols-outlined text-xl">settings</span>
-              계정 설정
-            </button>
           </nav>
         </aside>
 
@@ -227,18 +247,18 @@ export default function MenteeDashboardPage() {
                 <p className="text-sm font-semibold text-white">{formatDate(nextLesson.scheduledAt!)}</p>
                 <p className="text-2xl font-bold text-primary font-mono">{formatTime(nextLesson.scheduledAt!)}</p>
               </div>
-              <button className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-700 rounded-xl text-white text-sm font-semibold hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/40 transition-all">
+              <button 
+                onClick={() => navigate(`/tutorial/${nextLesson.tutorialId}`)}
+                className="px-5 py-2.5 bg-gradient-to-r from-primary to-blue-700 rounded-xl text-white text-sm font-semibold hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/40 transition-all"
+              >
                 강의실 입장
               </button>
             </div>
           )}
 
           {/* Course List */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-lg font-semibold text-white">내 수강 목록</h2>
-            <button className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-sm hover:bg-slate-700 hover:text-white transition-colors">
-              전체보기
-            </button>
           </div>
 
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden mb-6">
@@ -267,6 +287,8 @@ export default function MenteeDashboardPage() {
                   ? { label: '수강 중', className: 'bg-green-500/15 text-green-500' }
                   : course.status === 'waiting'
                   ? { label: '승인 대기', className: 'bg-amber-500/15 text-amber-500' }
+                  : course.status === 'unavailable'
+                  ? { label: '사용불가', className: 'bg-red-500/15 text-red-500' }
                   : { label: '수강 완료', className: 'bg-slate-500/15 text-slate-400' };
 
                 const progressColor = course.status === 'completed'
@@ -304,7 +326,10 @@ export default function MenteeDashboardPage() {
                       </div>
                     </div>
                     <div>
-                      {course.canBook ? (
+                      {course.status === 'unavailable' ? (
+                        // 사용불가 상태: 관리 버튼 없음
+                        null
+                      ) : course.canBook ? (
                         <button
                           onClick={() => setReservationModal({ isOpen: true, ticket: course })}
                           className="px-4 py-2 bg-gradient-to-r from-primary to-blue-700 rounded-lg text-white text-xs font-medium hover:shadow-lg hover:shadow-primary/30 transition-all"
@@ -326,17 +351,35 @@ export default function MenteeDashboardPage() {
                           수업 예정
                         </button>
                       ) : course.status === 'completed' ? (
-                        <button
-                          onClick={() => setReviewModal({
-                            isOpen: true,
-                            tutorialId: course.tutorialId,
-                            tutorialTitle: course.tutorialTitle,
-                            mentorNickname: course.mentorNickname,
-                          })}
-                          className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-medium hover:bg-slate-700 transition-colors"
-                        >
-                          리뷰 쓰기
-                        </button>
+                        course.review ? (
+                          <button
+                            onClick={() => setReviewModal({
+                              isOpen: true,
+                              tutorialId: course.tutorialId,
+                              tutorialTitle: course.tutorialTitle,
+                              mentorNickname: course.mentorNickname,
+                              reviewId: course.review.id,
+                              isEdit: true,
+                            })}
+                            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-medium hover:bg-slate-700 transition-colors"
+                          >
+                            리뷰 수정
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setReviewModal({
+                              isOpen: true,
+                              tutorialId: course.tutorialId,
+                              tutorialTitle: course.tutorialTitle,
+                              mentorNickname: course.mentorNickname,
+                              reviewId: undefined,
+                              isEdit: false,
+                            })}
+                            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-medium hover:bg-slate-700 transition-colors"
+                          >
+                            리뷰 쓰기
+                          </button>
+                        )
                       ) : (
                         <button className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-xs font-medium hover:bg-slate-700 transition-colors">
                           ⋯
@@ -385,15 +428,17 @@ export default function MenteeDashboardPage() {
         />
       )}
 
-      {/* 리뷰 작성 모달 */}
+      {/* 리뷰 작성/수정 모달 */}
       <ReviewWriteDialog
         open={reviewModal.isOpen}
         onOpenChange={(open) => setReviewModal({ ...reviewModal, isOpen: open })}
         tutorialId={reviewModal.tutorialId}
         tutorialTitle={reviewModal.tutorialTitle}
         mentorNickname={reviewModal.mentorNickname}
+        reviewId={reviewModal.reviewId}
+        isEdit={reviewModal.isEdit}
         onSuccess={() => {
-          alert('리뷰가 등록되었습니다!');
+          alert(reviewModal.isEdit ? '리뷰가 수정되었습니다!' : '리뷰가 등록되었습니다!');
           fetchData();
         }}
       />
